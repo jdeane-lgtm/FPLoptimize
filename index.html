@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FPL Team Optimizer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #37003c 0%, #1a001e 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: white;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .header h1 {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            color: #ddd;
+        }
+
+        .optimize-btn {
+            background: #ff2882;
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-block;
+        }
+
+        .optimize-btn:hover:not(:disabled) {
+            background: #e90052;
+            transform: scale(1.05);
+        }
+
+        .optimize-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #ff2882;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #dc2626;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .summary {
+            background: linear-gradient(135deg, #37003c 0%, #e90052 100%);
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .summary h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .position-section {
+            margin-bottom: 40px;
+        }
+
+        .position-section h3 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            padding: 10px 20px;
+            background: #ff2882;
+            display: inline-block;
+            border-radius: 8px;
+        }
+
+        .players-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .player-card {
+            background: white;
+            color: #37003c;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .player-card:hover {
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .player-card.bench {
+            opacity: 0.7;
+        }
+
+        .player-photo {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 50px;
+            height: 65px;
+            object-fit: cover;
+            opacity: 0.3;
+            border-radius: 5px;
+        }
+
+        .team-badge {
+            width: 24px;
+            height: 24px;
+            object-fit: contain;
+            margin-left: 5px;
+            vertical-align: middle;
+        }
+
+        .player-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+
+        .player-badges {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 8px;
+        }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 5px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: white;
+        }
+
+        .badge.gk { background: #10b981; }
+        .badge.def { background: #3b82f6; }
+        .badge.mid { background: #f59e0b; }
+        .badge.fwd { background: #ef4444; }
+        .badge.bench { background: #6b7280; }
+
+        .player-name {
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .player-team {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .player-cost {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #37003c;
+        }
+
+        .player-stats {
+            border-top: 2px solid #f0f0f0;
+            padding-top: 15px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .stat-item .label {
+            color: #666;
+        }
+
+        .stat-item .value {
+            font-weight: bold;
+            color: #e90052;
+        }
+
+        .info-section {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 30px;
+            border-radius: 15px;
+            margin-top: 40px;
+        }
+
+        .info-section h2 {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .info-item h3 {
+            color: #ff2882;
+            margin-bottom: 10px;
+        }
+
+        .info-item p {
+            color: #ddd;
+            line-height: 1.6;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        #results {
+            margin-top: 40px;
+        }
+
+        .reoptimize-btn {
+            background: white;
+            color: #37003c;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: block;
+            margin: 40px auto;
+        }
+
+        .reoptimize-btn:hover {
+            background: #f0f0f0;
+        }
+
+        .logo-scroll-container {
+            width: 100%;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px 0;
+            margin-bottom: 20px;
+            border-radius: 10px;
+        }
+
+        .logo-scroll {
+            display: flex;
+            animation: scroll 30s linear infinite;
+        }
+
+        .logo-scroll:hover {
+            animation-play-state: paused;
+        }
+
+        .logo-scroll img {
+            height: 50px;
+            width: 50px;
+            object-fit: contain;
+            margin: 0 25px;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+            transition: transform 0.3s;
+        }
+
+        .logo-scroll img:hover {
+            transform: scale(1.2);
+        }
+
+        @keyframes scroll {
+            0% {
+                transform: translateX(0);
+            }
+            100% {
+                transform: translateX(-50%);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo-scroll-container">
+            <div class="logo-scroll">
+                <img src="https://resources.premierleague.com/premierleague/badges/t3.png" alt="Arsenal" title="Arsenal">
+                <img src="https://resources.premierleague.com/premierleague/badges/t7.png" alt="Aston Villa" title="Aston Villa">
+                <img src="https://resources.premierleague.com/premierleague/badges/t91.png" alt="Bournemouth" title="Bournemouth">
+                <img src="https://resources.premierleague.com/premierleague/badges/t94.png" alt="Brentford" title="Brentford">
+                <img src="https://resources.premierleague.com/premierleague/badges/t36.png" alt="Brighton" title="Brighton">
+                <img src="https://resources.premierleague.com/premierleague/badges/t8.png" alt="Chelsea" title="Chelsea">
+                <img src="https://resources.premierleague.com/premierleague/badges/t31.png" alt="Crystal Palace" title="Crystal Palace">
+                <img src="https://resources.premierleague.com/premierleague/badges/t11.png" alt="Everton" title="Everton">
+                <img src="https://resources.premierleague.com/premierleague/badges/t54.png" alt="Fulham" title="Fulham">
+                <img src="https://resources.premierleague.com/premierleague/badges/t40.png" alt="Ipswich" title="Ipswich">
+                <img src="https://resources.premierleague.com/premierleague/badges/t13.png" alt="Leicester" title="Leicester">
+                <img src="https://resources.premierleague.com/premierleague/badges/t14.png" alt="Liverpool" title="Liverpool">
+                <img src="https://resources.premierleague.com/premierleague/badges/t43.png" alt="Man City" title="Man City">
+                <img src="https://resources.premierleague.com/premierleague/badges/t1.png" alt="Man Utd" title="Man Utd">
+                <img src="https://resources.premierleague.com/premierleague/badges/t4.png" alt="Newcastle" title="Newcastle">
+                <img src="https://resources.premierleague.com/premierleague/badges/t17.png" alt="Nott'm Forest" title="Nott'm Forest">
+                <img src="https://resources.premierleague.com/premierleague/badges/t20.png" alt="Southampton" title="Southampton">
+                <img src="https://resources.premierleague.com/premierleague/badges/t6.png" alt="Spurs" title="Spurs">
+                <img src="https://resources.premierleague.com/premierleague/badges/t21.png" alt="West Ham" title="West Ham">
+                <img src="https://resources.premierleague.com/premierleague/badges/t39.png" alt="Wolves" title="Wolves">
+                <!-- Duplicate for seamless loop -->
+                <img src="https://resources.premierleague.com/premierleague/badges/t3.png" alt="Arsenal" title="Arsenal">
+                <img src="https://resources.premierleague.com/premierleague/badges/t7.png" alt="Aston Villa" title="Aston Villa">
+                <img src="https://resources.premierleague.com/premierleague/badges/t91.png" alt="Bournemouth" title="Bournemouth">
+                <img src="https://resources.premierleague.com/premierleague/badges/t94.png" alt="Brentford" title="Brentford">
+                <img src="https://resources.premierleague.com/premierleague/badges/t36.png" alt="Brighton" title="Brighton">
+                <img src="https://resources.premierleague.com/premierleague/badges/t8.png" alt="Chelsea" title="Chelsea">
+                <img src="https://resources.premierleague.com/premierleague/badges/t31.png" alt="Crystal Palace" title="Crystal Palace">
+                <img src="https://resources.premierleague.com/premierleague/badges/t11.png" alt="Everton" title="Everton">
+                <img src="https://resources.premierleague.com/premierleague/badges/t54.png" alt="Fulham" title="Fulham">
+                <img src="https://resources.premierleague.com/premierleague/badges/t40.png" alt="Ipswich" title="Ipswich">
+                <img src="https://resources.premierleague.com/premierleague/badges/t13.png" alt="Leicester" title="Leicester">
+                <img src="https://resources.premierleague.com/premierleague/badges/t14.png" alt="Liverpool" title="Liverpool">
+                <img src="https://resources.premierleague.com/premierleague/badges/t43.png" alt="Man City" title="Man City">
+                <img src="https://resources.premierleague.com/premierleague/badges/t1.png" alt="Man Utd" title="Man Utd">
+                <img src="https://resources.premierleague.com/premierleague/badges/t4.png" alt="Newcastle" title="Newcastle">
+                <img src="https://resources.premierleague.com/premierleague/badges/t17.png" alt="Nott'm Forest" title="Nott'm Forest">
+                <img src="https://resources.premierleague.com/premierleague/badges/t20.png" alt="Southampton" title="Southampton">
+                <img src="https://resources.premierleague.com/premierleague/badges/t6.png" alt="Spurs" title="Spurs">
+                <img src="https://resources.premierleague.com/premierleague/badges/t21.png" alt="West Ham" title="West Ham">
+                <img src="https://resources.premierleague.com/premierleague/badges/t39.png" alt="Wolves" title="Wolves">
+            </div>
+        </div>
+        <div class="header">
+            <h1>FPL Transfer Advisor</h1>
+            <p>Get optimal transfer recommendations for your Fantasy Premier League team</p>
+            <p style="font-size: 1rem; margin-top: 10px;">Analyze your team and get smart transfer suggestions</p>
+        </div>
+
+        <div id="initialScreen" style="text-align: center;">
+            <div style="max-width: 600px; margin: 0 auto 40px;">
+                <label style="display: block; font-size: 1.2rem; margin-bottom: 15px; color: white;">
+                    Enter Your FPL Team ID
+                </label>
+                <input 
+                    type="text" 
+                    id="teamId" 
+                    placeholder="e.g., 123456" 
+                    style="width: 100%; padding: 15px; font-size: 1.1rem; border: 2px solid #ff2882; border-radius: 10px; text-align: center; margin-bottom: 15px;"
+                />
+                
+                <div style="background: rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: left;">
+                    <h4 style="color: #ff2882; margin-bottom: 10px; font-size: 1rem;">📍 How to Find Your Team ID:</h4>
+                    <ol style="color: #ddd; font-size: 0.9rem; line-height: 1.8; margin-left: 20px;">
+                        <li>Go to <a href="https://fantasy.premierleague.com" target="_blank" style="color: #ff2882; text-decoration: underline;">fantasy.premierleague.com</a></li>
+                        <li>Click on "Points" or "Transfers" in the menu</li>
+                        <li>Look at your browser's address bar</li>
+                        <li>Copy the <strong>numbers</strong> from the URL:<br/>
+                            <code style="background: rgba(0,0,0,0.3); padding: 5px 10px; border-radius: 5px; display: inline-block; margin-top: 5px;">
+                                fantasy.premierleague.com/entry/<span style="color: #ff2882; font-weight: bold;">1234567</span>/event/12
+                            </code>
+                        </li>
+                    </ol>
+                </div>
+                
+                <button class="optimize-btn" onclick="analyzeTeam()">Analyze My Team</button>
+            </div>
+            
+            <div class="info-section">
+                <h2>How It Works</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <h3>🔍 Team Analysis</h3>
+                        <p>Fetches your current FPL team and analyzes each player's expected performance for upcoming fixtures.</p>
+                    </div>
+                    <div class="info-item">
+                        <h3>🎯 Smart Recommendations</h3>
+                        <p>Identifies underperforming players and suggests optimal transfers within your budget constraints.</p>
+                    </div>
+                    <div class="info-item">
+                        <h3>⚡ Fixture-Based</h3>
+                        <p>Recommends players with favorable upcoming fixtures and strong recent form.</p>
+                    </div>
+                    <div class="info-item">
+                        <h3>💰 Budget Aware</h3>
+                        <p>All suggestions respect your available budget and free transfer allowance.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p id="loadingText">Fetching your team data...</p>
+            <p style="margin-top: 10px; opacity: 0.8;" id="loadingSubtext">Analyzing player performance and fixtures...</p>
+        </div>
+
+        <div id="error" class="error hidden">
+            <p id="errorMessage"></p>
+            <button class="optimize-btn" style="margin-top: 15px;" onclick="analyzeTeam()">Try Again</button>
+        </div>
+
+        <div id="results" class="hidden"></div>
+    </div>
+
+    <script>
+        let allPlayers = [];
+        let allTeams = [];
+        let currentTeamData = null;
+
+        async function analyzeTeam() {
+            const teamId = document.getElementById('teamId').value.trim();
+            
+            if (!teamId || isNaN(teamId)) {
+                alert('Please enter a valid Team ID (numbers only)');
+                return;
+            }
+            // Hide initial screen, show loading
+            document.getElementById('initialScreen').classList.add('hidden');
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('error').classList.add('hidden');
+            document.getElementById('results').classList.add('hidden');
+
+            try {
+                // Always use our API proxy (works on both localhost and Vercel)
+                const proxyUrl = (endpoint) => `/api/fpl?endpoint=${endpoint}`;
+                
+                // Fetch FPL data
+                const bootstrapRes = await fetch(proxyUrl('bootstrap-static/'));
+                
+                if (!bootstrapRes.ok) {
+                    throw new Error(`HTTP error! status: ${bootstrapRes.status}`);
+                }
+                
+                const bootstrapData = await bootstrapRes.json();
+
+                const fixturesRes = await fetch(proxyUrl('fixtures/'));
+                
+                if (!fixturesRes.ok) {
+                    throw new Error(`HTTP error! status: ${fixturesRes.status}`);
+                }
+                
+                const allFixtures = await fixturesRes.json();
+
+                // Get current gameweek
+                const currentEvent = bootstrapData.events.find(e => e.is_current);
+                const currentGW = currentEvent ? currentEvent.id : 1;
+
+                // Process teams with badges
+                allTeams = bootstrapData.teams.map(team => ({
+                    id: team.id,
+                    name: team.name,
+                    short_name: team.short_name,
+                    badge: `https://resources.premierleague.com/premierleague/badges/t${team.code}.png`
+                }));
+
+                // Get next 3 gameweeks fixtures
+                const next3GWFixtures = allFixtures.filter(f => 
+                    f.event >= currentGW && f.event < currentGW + 3
+                );
+
+                // Build detailed fixture list per team with opponents
+                const teamFixtures = {};
+                allTeams.forEach(team => {
+                    teamFixtures[team.id] = [];
+                });
+
+                next3GWFixtures.forEach(fixture => {
+                    if (fixture.team_h && fixture.team_a) {
+                        // Home team fixture
+                        teamFixtures[fixture.team_h]?.push({
+                            opponent: fixture.team_a,
+                            isHome: true,
+                            difficulty: fixture.team_h_difficulty || 3,
+                            gameweek: fixture.event
+                        });
+                        
+                        // Away team fixture
+                        teamFixtures[fixture.team_a]?.push({
+                            opponent: fixture.team_h,
+                            isHome: false,
+                            difficulty: fixture.team_a_difficulty || 3,
+                            gameweek: fixture.event
+                        });
+                    }
+                });
+
+                // Process players
+                const positionMap = { 1: 'GK', 2: 'DEF', 3: 'MID', 4: 'FWD' };
+                
+                allPlayers = bootstrapData.elements.map(player => {
+                    const team = allTeams.find(t => t.id === player.team);
+                    const form = parseFloat(player.form) || 0;
+                    const fixtures = teamFixtures[player.team] || [];
+                    
+                    // Get historical points (total points so far this season)
+                    const totalPointsSoFar = player.total_points || 0;
+                    const gameweeksPlayed = currentGW - 1; // Number of completed gameweeks
+                    const avgPointsPerGW = gameweeksPlayed > 0 ? totalPointsSoFar / gameweeksPlayed : form;
+                    
+                    // Combine historical average with form for base prediction
+                    const basePoints = gameweeksPlayed > 2 ? 
+                        (avgPointsPerGW * 0.6 + form * 0.4) : // Use historical if we have data
+                        form; // Use form if season just started
+                    
+                    // Calculate expected points based on actual fixtures
+                    let expectedPoints = 0;
+                    if (fixtures.length > 0) {
+                        fixtures.forEach(fixture => {
+                            let fixturePoints = basePoints;
+                            
+                            // Difficulty modifier: easier fixtures = more expected points
+                            // Difficulty scale is 1 (easiest) to 5 (hardest)
+                            const difficultyModifier = 1 + (3 - fixture.difficulty) * 0.2;
+                            
+                            // Home advantage: +10% for home games, -5% for away
+                            const homeModifier = fixture.isHome ? 1.1 : 0.95;
+                            
+                            fixturePoints = fixturePoints * difficultyModifier * homeModifier;
+                            expectedPoints += fixturePoints;
+                        });
+                    } else {
+                        // No fixtures (blank gameweek)
+                        expectedPoints = 0;
+                    }
+                    
+                    // Get fixture descriptions for display
+                    const fixtureDescriptions = fixtures.map(f => {
+                        const opponent = allTeams.find(t => t.id === f.opponent);
+                        return `${f.isHome ? 'vs' : '@'} ${opponent?.short_name || '?'} (GW${f.gameweek})`;
+                    }).join(', ');
+
+                    return {
+                        id: player.id,
+                        name: player.web_name,
+                        firstName: player.first_name,
+                        lastName: player.second_name,
+                        team: player.team,
+                        teamName: team?.short_name || '',
+                        teamBadge: team?.badge || '',
+                        position: player.element_type,
+                        positionName: positionMap[player.element_type],
+                        cost: player.now_cost / 10,
+                        expectedPoints: expectedPoints,
+                        form: player.form,
+                        selectedBy: player.selected_by_percent,
+                        totalPoints: totalPointsSoFar,
+                        avgPointsPerGW: avgPointsPerGW.toFixed(1),
+                        pointsPerMillionCost: (totalPointsSoFar / (player.now_cost / 10)).toFixed(1),
+                        photo: `https://resources.premierleague.com/premierleague/photos/players/110x140/p${player.code}.png`,
+                        fixtures: fixtures,
+                        fixtureDescriptions: fixtureDescriptions
+                    };
+                }).filter(p => p.cost > 0);
+
+                // Fetch user's current team
+                document.getElementById('loadingText').textContent = 'Fetching your current team...';
+                const teamRes = await fetch(proxyUrl(`entry/${teamId}/event/${currentGW}/picks/`));
+                
+                if (!teamRes.ok) {
+                    throw new Error(`Could not fetch team ${teamId}. Please check your Team ID.`);
+                }
+                
+                const teamData = await teamRes.json();
+                
+                // Fetch manager info
+                const managerRes = await fetch(proxyUrl(`entry/${teamId}/`));
+                const managerData = await managerRes.json();
+                
+                // Map current team players
+                const currentTeamPlayers = teamData.picks.map(pick => {
+                    const playerData = allPlayers.find(p => p.id === pick.element);
+                    if (playerData) {
+                        return {
+                            ...playerData,
+                            pickPosition: pick.position,
+                            isCaptain: pick.is_captain,
+                            isViceCaptain: pick.is_vice_captain,
+                            multiplier: pick.multiplier
+                        };
+                    }
+                    return null;
+                }).filter(p => p !== null);
+
+                // Analyze and get transfer recommendations
+                document.getElementById('loadingText').textContent = 'Analyzing your team...';
+                const recommendations = analyzeAndRecommend(currentTeamPlayers, allPlayers, managerData);
+
+                // Display results
+                displayTransferRecommendations(currentTeamPlayers, recommendations, managerData);
+
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('results').classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('error').classList.remove('hidden');
+                
+                let errorMsg = 'Failed to fetch FPL data. ';
+                
+                if (error.message.includes('CORS') || error.message.includes('NetworkError') || window.location.protocol === 'file:') {
+                    errorMsg += 'To fix this: Right-click the index.html file and open it with a web browser (Chrome, Safari, or Firefox). Or use a local web server.';
+                } else if (error.message.includes('HTTP error')) {
+                    errorMsg += 'The FPL API is currently unavailable. Please try again later.';
+                } else {
+                    errorMsg += 'Please check your internet connection and try again. Error: ' + error.message;
+                }
+                
+                document.getElementById('errorMessage').textContent = errorMsg;
+            }
+        }
+
+        function analyzeAndRecommend(currentTeam, allPlayers, managerData) {
+            const startingXI = currentTeam.filter(p => p.pickPosition <= 11).sort((a, b) => a.pickPosition - b.pickPosition);
+            const bench = currentTeam.filter(p => p.pickPosition > 11).sort((a, b) => a.pickPosition - b.pickPosition);
+            
+            // Calculate available budget
+            const teamValue = currentTeam.reduce((sum, p) => sum + p.cost, 0);
+            const bankBalance = managerData.last_deadline_bank / 10; // Convert to millions
+            
+            // Find underperformers (bottom 30% of expected points in current team)
+            const sortedByExpected = [...currentTeam].sort((a, b) => b.expectedPoints - a.expectedPoints);
+            const avgExpected = sortedByExpected.reduce((sum, p) => sum + p.expectedPoints, 0) / sortedByExpected.length;
+            
+            const underperformers = currentTeam.filter(p => p.expectedPoints < avgExpected * 0.7).sort((a, b) => a.expectedPoints - b.expectedPoints);
+            
+            const recommendations = [];
+            
+            // For each underperformer, find better alternatives
+            for (const underperformer of underperformers.slice(0, 3)) { // Top 3 worst performers
+                const availableBudget = underperformer.cost + bankBalance;
+                
+                // Find better players in same position, not in current team
+                const alternatives = allPlayers.filter(p => 
+                    p.position === underperformer.position &&
+                    p.cost <= availableBudget &&
+                    !currentTeam.some(ct => ct.id === p.id) &&
+                    p.expectedPoints > underperformer.expectedPoints
+                ).sort((a, b) => b.expectedPoints - a.expectedPoints).slice(0, 3);
+                
+                if (alternatives.length > 0) {
+                    recommendations.push({
+                        playerOut: underperformer,
+                        playerIn: alternatives[0],
+                        alternatives: alternatives.slice(1),
+                        pointsGain: (alternatives[0].expectedPoints - underperformer.expectedPoints).toFixed(1),
+                        costDiff: (alternatives[0].cost - underperformer.cost).toFixed(1)
+                    });
+                }
+            }
+            
+            return {
+                startingXI,
+                bench,
+                recommendations,
+                teamValue: teamValue.toFixed(1),
+                bankBalance: bankBalance.toFixed(1),
+                totalExpectedPoints: startingXI.reduce((sum, p) => sum + p.expectedPoints, 0).toFixed(1),
+                managerName: `${managerData.player_first_name} ${managerData.player_last_name}`,
+                teamName: managerData.name
+            };
+        }
+
+        function displayTransferRecommendations(currentTeam, analysis, managerData) {
+            const { startingXI, bench, recommendations, teamValue, bankBalance, totalExpectedPoints, managerName, teamName } = analysis;
+
+            const startingByPosition = {
+                1: startingXI.filter(p => p.position === 1),
+                2: startingXI.filter(p => p.position === 2),
+                3: startingXI.filter(p => p.position === 3),
+                4: startingXI.filter(p => p.position === 4)
+            };
+
+            const formation = `${startingByPosition[2].length}-${startingByPosition[3].length}-${startingByPosition[4].length}`;
+
+            let html = `
+                <div class="summary">
+                    <h2>🏆 ${teamName}</h2>
+                    <p style="font-size: 1.1rem; margin-bottom: 20px; opacity: 0.9;">Manager: ${managerName}</p>
+                    <div class="stats">
+                        <div>
+                            <div class="stat-label">Team Value</div>
+                            <div class="stat-value">£${teamValue}m</div>
+                            <div class="stat-label" style="opacity: 0.7;">Bank: £${bankBalance}m</div>
+                        </div>
+                        <div>
+                            <div class="stat-label">Expected Points</div>
+                            <div class="stat-value">${totalExpectedPoints}</div>
+                            <div class="stat-label" style="opacity: 0.7;">next 3 gameweeks</div>
+                        </div>
+                        <div>
+                            <div class="stat-label">Formation</div>
+                            <div class="stat-value">${formation}</div>
+                            <div class="stat-label" style="opacity: 0.7;">current lineup</div>
+                        </div>
+                        <div>
+                            <div class="stat-label">Transfer Suggestions</div>
+                            <div class="stat-value">${recommendations.length}</div>
+                            <div class="stat-label" style="opacity: 0.7;">recommended</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 10px; margin-bottom: 30px;">
+                    <h4 style="color: white; margin-bottom: 10px;">📊 Fixture Difficulty Legend</h4>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <span style="padding: 5px 10px; background: #10b981; color: white; border-radius: 5px; font-size: 0.9rem;">Very Easy (1)</span>
+                        <span style="padding: 5px 10px; background: #84cc16; color: white; border-radius: 5px; font-size: 0.9rem;">Easy (2)</span>
+                        <span style="padding: 5px 10px; background: #fbbf24; color: white; border-radius: 5px; font-size: 0.9rem;">Medium (3)</span>
+                        <span style="padding: 5px 10px; background: #f97316; color: white; border-radius: 5px; font-size: 0.9rem;">Hard (4)</span>
+                        <span style="padding: 5px 10px; background: #ef4444; color: white; border-radius: 5px; font-size: 0.9rem;">Very Hard (5)</span>
+                    </div>
+                    <p style="color: #ddd; margin-top: 10px; font-size: 0.9rem;">Predictions are based on actual upcoming fixtures, home/away advantage, and opponent difficulty.</p>
+                </div>
+
+                ${recommendations.length > 0 ? `
+                <div class="position-section">
+                    <h3 style="background: #10b981;">✅ Recommended Transfers</h3>
+                    <p style="color: white; margin-bottom: 20px; font-size: 1.1rem;">These transfers could improve your team's expected points</p>
+                    
+                    ${recommendations.map((rec, index) => `
+                        <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 10px; margin-bottom: 20px; border: 2px solid #10b981;">
+                            <h4 style="color: #10b981; margin-bottom: 15px; font-size: 1.3rem;">Transfer ${index + 1}: +${rec.pointsGain} Expected Points</h4>
+                            <div style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 20px; align-items: center;">
+                                <div>
+                                    <p style="color: #ef4444; font-weight: bold; margin-bottom: 10px;">❌ TRANSFER OUT</p>
+                                    ${createPlayerCard(rec.playerOut, false, true)}
+                                </div>
+                                <div style="text-align: center; color: white; font-size: 2rem;">→</div>
+                                <div>
+                                    <p style="color: #10b981; font-weight: bold; margin-bottom: 10px;">✅ TRANSFER IN</p>
+                                    ${createPlayerCard(rec.playerIn, false, false)}
+                                </div>
+                            </div>
+                            <div style="margin-top: 15px; padding: 15px; background: rgba(16, 185, 129, 0.1); border-radius: 8px;">
+                                <p style="color: white; font-size: 1rem;">
+                                    <strong>Cost Change:</strong> ${rec.costDiff > 0 ? '+' : ''}£${rec.costDiff}m | 
+                                    <strong>Expected Points Gain:</strong> +${rec.pointsGain} over next 3 gameweeks
+                                </p>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                ` : `
+                <div class="position-section">
+                    <h3 style="background: #10b981;">✅ Team Looking Good!</h3>
+                    <p style="color: white; margin: 20px 0; font-size: 1.2rem;">No obvious transfer opportunities found. Your current team is well-optimized for the upcoming fixtures!</p>
+                </div>
+                `}
+
+                <div class="position-section">
+                    <h3>Your Current Team</h3>
+                    
+                    <h4 style="color: white; margin: 20px 0 10px 0; font-size: 1.2rem;">Starting XI</h4>
+                    
+                    <h5 style="color: white; margin: 15px 0 10px 0;">Goalkeeper</h5>
+                    <div class="players-grid">
+                        ${startingByPosition[1].map(p => createPlayerCard(p, false, false)).join('')}
+                    </div>
+
+                    <h5 style="color: white; margin: 15px 0 10px 0;">Defenders (${startingByPosition[2].length})</h5>
+                    <div class="players-grid">
+                        ${startingByPosition[2].map(p => createPlayerCard(p, false, false)).join('')}
+                    </div>
+
+                    <h5 style="color: white; margin: 15px 0 10px 0;">Midfielders (${startingByPosition[3].length})</h5>
+                    <div class="players-grid">
+                        ${startingByPosition[3].map(p => createPlayerCard(p, false, false)).join('')}
+                    </div>
+
+                    <h5 style="color: white; margin: 15px 0 10px 0;">Forwards (${startingByPosition[4].length})</h5>
+                    <div class="players-grid">
+                        ${startingByPosition[4].map(p => createPlayerCard(p, false, false)).join('')}
+                    </div>
+
+                    <h4 style="color: white; margin: 30px 0 10px 0; font-size: 1.2rem;">Bench</h4>
+                    <div class="players-grid">
+                        ${bench.map(p => createPlayerCard(p, true, false)).join('')}
+                    </div>
+                </div>
+
+                <button class="reoptimize-btn" onclick="location.reload()">Analyze Another Team</button>
+            `;
+
+            document.getElementById('results').innerHTML = html;
+        }
+
+        function optimizeSquadGreedy(players) {
+            // Sort players by points per million (value)
+            const sortedPlayers = [...players].sort((a, b) => {
+                const valueA = a.expectedPoints / a.cost;
+                const valueB = b.expectedPoints / b.cost;
+                return valueB - valueA;
+            });
+
+            const squad = [];
+            const teamCounts = {};
+            const positionCounts = { 1: 0, 2: 0, 3: 0, 4: 0 };
+            const positionLimits = { 1: 2, 2: 5, 3: 5, 4: 3 };
+            let totalCost = 0;
+            const maxBudget = 100;
+
+            // Greedy selection
+            for (const player of sortedPlayers) {
+                if (squad.length >= 15) break;
+
+                const teamCount = teamCounts[player.team] || 0;
+                const positionCount = positionCounts[player.position];
+
+                if (teamCount >= 3) continue;
+                if (positionCount >= positionLimits[player.position]) continue;
+                if (totalCost + player.cost > maxBudget) continue;
+
+                squad.push(player);
+                teamCounts[player.team] = teamCount + 1;
+                positionCounts[player.position]++;
+                totalCost += player.cost;
+            }
+
+            // Select starting XI
+            const startingXI = selectStartingXI(squad);
+            const bench = squad.filter(p => !startingXI.includes(p));
+
+            return {
+                squad,
+                startingXI,
+                bench,
+                totalCost: totalCost.toFixed(1),
+                totalExpectedPoints: startingXI.reduce((sum, p) => sum + p.expectedPoints, 0).toFixed(1)
+            };
+        }
+
+        function selectStartingXI(squad) {
+            const byPosition = {
+                1: squad.filter(p => p.position === 1).sort((a, b) => b.expectedPoints - a.expectedPoints),
+                2: squad.filter(p => p.position === 2).sort((a, b) => b.expectedPoints - a.expectedPoints),
+                3: squad.filter(p => p.position === 3).sort((a, b) => b.expectedPoints - a.expectedPoints),
+                4: squad.filter(p => p.position === 4).sort((a, b) => b.expectedPoints - a.expectedPoints)
+            };
+
+            const formations = [
+                { def: 3, mid: 4, fwd: 3 },
+                { def: 3, mid: 5, fwd: 2 },
+                { def: 4, mid: 3, fwd: 3 },
+                { def: 4, mid: 4, fwd: 2 },
+                { def: 4, mid: 5, fwd: 1 },
+                { def: 5, mid: 3, fwd: 2 },
+                { def: 5, mid: 4, fwd: 1 }
+            ];
+
+            let bestFormation = [];
+            let bestPoints = 0;
+
+            formations.forEach(formation => {
+                if (byPosition[2].length >= formation.def &&
+                    byPosition[3].length >= formation.mid &&
+                    byPosition[4].length >= formation.fwd) {
+                    
+                    const lineup = [
+                        ...byPosition[2].slice(0, formation.def),
+                        ...byPosition[3].slice(0, formation.mid),
+                        ...byPosition[4].slice(0, formation.fwd)
+                    ];
+                    
+                    const points = lineup.reduce((sum, p) => sum + p.expectedPoints, 0);
+                    
+                    if (points > bestPoints) {
+                        bestPoints = points;
+                        bestFormation = lineup;
+                    }
+                }
+            });
+
+            return [byPosition[1][0], ...bestFormation];
+        }
+
+        function displayResults(optimizedSquad) {
+            const { squad, startingXI, bench, totalCost, totalExpectedPoints } = optimizedSquad;
+
+            const startingByPosition = {
+                1: startingXI.filter(p => p.position === 1),
+                2: startingXI.filter(p => p.position === 2),
+                3: startingXI.filter(p => p.position === 3),
+                4: startingXI.filter(p => p.position === 4)
+            };
+
+            const formation = `${startingByPosition[2].length}-${startingByPosition[3].length}-${startingByPosition[4].length}`;
+
+            let html = `
+                <div class="summary">
+                    <h2>Your Optimized Squad</h2>
+                    <div class="stats">
+                        <div>
+                            <div class="stat-label">Total Squad Cost</div>
+                            <div class="stat-value">£${totalCost}m</div>
+                            <div class="stat-label" style="opacity: 0.7;">of £100.0m</div>
+                        </div>
+                        <div>
+                            <div class="stat-label">Starting XI Expected Points</div>
+                            <div class="stat-value">${totalExpectedPoints}</div>
+                            <div class="stat-label" style="opacity: 0.7;">next 3 gameweeks</div>
+                        </div>
+                        <div>
+                            <div class="stat-label">Formation</div>
+                            <div class="stat-value">${formation}</div>
+                            <div class="stat-label" style="opacity: 0.7;">optimal lineup</div>
+                        </div>
+                        <div>
+                            <div class="stat-label">Total Points This Season</div>
+                            <div class="stat-value">${startingXI.reduce((sum, p) => sum + p.totalPoints, 0)}</div>
+                            <div class="stat-label" style="opacity: 0.7;">historical performance</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="position-section">
+                    <h3>Starting XI</h3>
+                    
+                    <h4 style="color: white; margin: 20px 0 10px 0; font-size: 1.2rem;">Goalkeeper</h4>
+                    <div class="players-grid">
+                        ${startingByPosition[1].map(p => createPlayerCard(p, false)).join('')}
+                    </div>
+
+                    <h4 style="color: white; margin: 20px 0 10px 0; font-size: 1.2rem;">Defenders (${startingByPosition[2].length})</h4>
+                    <div class="players-grid">
+                        ${startingByPosition[2].map(p => createPlayerCard(p, false)).join('')}
+                    </div>
+
+                    <h4 style="color: white; margin: 20px 0 10px 0; font-size: 1.2rem;">Midfielders (${startingByPosition[3].length})</h4>
+                    <div class="players-grid">
+                        ${startingByPosition[3].map(p => createPlayerCard(p, false)).join('')}
+                    </div>
+
+                    <h4 style="color: white; margin: 20px 0 10px 0; font-size: 1.2rem;">Forwards (${startingByPosition[4].length})</h4>
+                    <div class="players-grid">
+                        ${startingByPosition[4].map(p => createPlayerCard(p, false)).join('')}
+                    </div>
+                </div>
+
+                <div class="position-section">
+                    <h3 style="background: #6b7280;">Bench</h3>
+                    <div class="players-grid">
+                        ${bench.map(p => createPlayerCard(p, true)).join('')}
+                    </div>
+                </div>
+
+                <button class="reoptimize-btn" onclick="optimizeTeam()">Re-optimize Squad</button>
+            `;
+
+            document.getElementById('results').innerHTML = html;
+        }
+
+        function createPlayerCard(player, isBench, isTransferOut = false) {
+            const positionClass = player.positionName.toLowerCase();
+            
+            // Create fixture display with difficulty colors
+            const fixturesHTML = player.fixtures && player.fixtures.length > 0 ? 
+                player.fixtures.map(f => {
+                    const opponent = allTeams.find(t => t.id === f.opponent);
+                    const difficultyColors = {
+                        1: '#10b981', // Very easy - green
+                        2: '#84cc16', // Easy - lime
+                        3: '#fbbf24', // Medium - yellow
+                        4: '#f97316', // Hard - orange
+                        5: '#ef4444'  // Very hard - red
+                    };
+                    const color = difficultyColors[f.difficulty] || '#6b7280';
+                    return `<span style="display: inline-block; margin: 2px; padding: 3px 6px; background: ${color}; color: white; border-radius: 4px; font-size: 0.7rem; font-weight: bold;">
+                        ${f.isHome ? 'vs' : '@'} ${opponent?.short_name || '?'}
+                    </span>`;
+                }).join('') : 
+                '<span style="color: #ef4444; font-size: 0.75rem;">No fixtures</span>';
+            
+            return `
+                <div class="player-card ${isBench ? 'bench' : ''}" style="${isTransferOut ? 'border: 2px solid #ef4444;' : ''}">
+                    <img src="${player.photo}" class="player-photo" alt="${player.name}" onerror="this.style.display='none'" />
+                    <div class="player-header">
+                        <div>
+                            <div class="player-badges">
+                                <span class="badge ${positionClass}">${player.positionName}</span>
+                                ${isBench ? '<span class="badge bench">BENCH</span>' : ''}
+                            </div>
+                            <div class="player-name">${player.name}</div>
+                            <div class="player-team">
+                                ${player.teamName}
+                                <img src="${player.teamBadge}" class="team-badge" alt="${player.teamName}" onerror="this.style.display='none'" />
+                            </div>
+                        </div>
+                        <div class="player-cost">£${player.cost.toFixed(1)}m</div>
+                    </div>
+                    <div style="margin: 10px 0; padding: 8px; background: rgba(0,0,0,0.1); border-radius: 5px;">
+                        <div style="font-size: 0.75rem; color: #666; margin-bottom: 4px; font-weight: bold;">Upcoming Fixtures:</div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 2px;">
+                            ${fixturesHTML}
+                        </div>
+                    </div>
+                    <div class="player-stats">
+                        <div class="stat-item">
+                            <span class="label">Expected (3 GW)</span>
+                            <span class="value">${player.expectedPoints.toFixed(1)}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="label">Total Points</span>
+                            <span class="value">${player.totalPoints}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="label">Form</span>
+                            <span class="value">${player.form}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
