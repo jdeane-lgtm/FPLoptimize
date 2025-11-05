@@ -1,0 +1,13 @@
+{
+  "buildCommand": null,
+  "devCommand": null,
+  "installCommand": null,
+  "framework": null,
+  "outputDirectory": ".",
+  "rewrites": [
+    {
+      "source": "/api/fpl/:path*",
+      "destination": "/api/fpl?path=:path*"
+    }
+  ]
+}
